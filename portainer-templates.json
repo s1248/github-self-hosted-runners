@@ -1,30 +1,29 @@
-{
-  "version": "3.8",
-  "templates": [
-    {
-      "type": 3,
-      "title": "Self-Hosted GitHub Runner (Swarm via Secret)",
-      "description": "Deploy a GitHub Runner using a secure Docker Secret. IMPORTANT: Before deploying, you must create a Docker Secret named 'runner_token' with your GitHub registration token as its value.",
-      "image": "s1248/github-self-hosted-runners:latest",
-      "repository": {
-        "url": "https://github.com/s1248/github-self-hosted-runners",
-        "stackfile": "docker-compose.yml"
+[
+  {
+    "type": 3,
+    "title": "Self-Hosted GitHub Runner (Swarm via Secret)",
+    "description": "Triển khai một GitHub Runner tự host sử dụng Docker Secret để bảo mật token. <strong>QUAN TRỌNG:</strong> Trước khi triển khai, bạn phải tạo một Docker Secret trong Swarm với tên là 'runner_token' và giá trị là registration token bạn nhận được từ GitHub.",
+    "image": "s1248/github-self-hosted-runners:latest",
+    "repository": {
+      "url": "https://github.com/s1248/github-self-hosted-runners",
+      "stackfile": "docker-compose.yml"
+    },
+    "platform": "linux",
+    "categories": [
+      "CI/CD"
+    ],
+    "env": [
+      {
+        "name": "ACTIONS_RUNNER_INPUT_URL",
+        "label": "URL Đăng ký Runner",
+        "description": "URL của repository hoặc organization (ví dụ: https://github.com/my-org/my-repo)"
       },
-      "platform": "linux",
-      "categories": [ "CI/CD" ],
-      "env": [
-        {
-          "name": "ACTIONS_RUNNER_INPUT_URL",
-          "label": "Runner Registration URL",
-          "description": "The URL of the repository or organization (e.g., https://github.com/my-org/my-repo)"
-        },
-        {
-          "name": "ACTIONS_RUNNER_INPUT_LABELS",
-          "label": "Runner Labels (Optional)",
-          "description": "Comma-separated labels for this runner",
-          "default": "self-hosted-runners,ubuntu24"
-        }
-      ]
-    }
-  ]
-}
+      {
+        "name": "ACTIONS_RUNNER_INPUT_LABELS",
+        "label": "Nhãn cho Runner (Tùy chọn)",
+        "description": "Các nhãn phân cách bởi dấu phẩy cho runner này",
+        "default": "self-hosted-runners,ubuntu24"
+      }
+    ]
+  }
+]
