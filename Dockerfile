@@ -1,5 +1,5 @@
 # Sử dụng base image Ubuntu 24.04
-FROM ubuntu:24.04
+FROM ubuntu:22.04.5
 
 # Thêm thông tin về giấy phép và người bảo trì
 LABEL maintainer="s1248.com <github-self-hosted-runners@s1248.com>"
@@ -13,8 +13,8 @@ ENV RUNNER_USER="runner"
 ENV RUNNER_HOME="/home/runner"
 ENV ACTIONS_RUNNER_INPUT_URL=""
 ENV ACTIONS_RUNNER_INPUT_TOKEN=""
-#ENV ACTIONS_RUNNER_INPUT_LABELS="ubuntu-24.04,arm64"
-ENV ACTIONS_RUNNER_INPUT_LABELS="ubuntu-24.04,arm64"
+#ENV ACTIONS_RUNNER_INPUT_LABELS="ubuntu-24.04"
+ENV ACTIONS_RUNNER_INPUT_LABELS="ubuntu-22.04.5,arm64"
 
 # Cập nhật hệ thống và cài đặt các dependencies cần thiết
 RUN apt-get update && apt-get install -y \
