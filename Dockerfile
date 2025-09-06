@@ -33,9 +33,9 @@ WORKDIR "${RUNNER_HOME}"
 
 # Tải và cài đặt GitHub Actions runner phù hợp với kiến trúc
 RUN set -e; \
-    if [ "$TARGETARCH" = "amd64" ]; then export ARCH="x64"; \
-    elif [ "$TARGETARCH" = "arm64" ]; then export ARCH="arm64"; \
-    elif [ "$TARGETARCH" = "arm" ]; then export ARCH="arm"; \
+    if [ "$TARGETARCH" = "amd64" ]; then ARCH="x64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then ARCH="arm64"; \
+    elif [ "$TARGETARCH" = "arm" ] || [ "$TARGETARCH" = "arm/v7" ]; then ARCH="arm"; \
     else echo "Unsupported architecture: $TARGETARCH" && exit 1; fi; \
     curl -o actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz && \
     tar xzf ./actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz && \
