@@ -1,13 +1,23 @@
 version: '3.8'
 
 services:
-  github-runner:
-    # Pull image công khai từ GitHub Container Registry
-    image: ghcr.io/s1248/github-self-hosted-runners:latest
-    container_name: github-runner
-    restart: always
+  runner:
+    image: s1248/github-self-hosted-runners:latest
     environment:
-      # Các biến này sẽ được đọc từ file .env cục bộ trên server
+      # URL và Labels sẽ do người dùng nhập vào
       - ACTIONS_RUNNER_INPUT_URL=${ACTIONS_RUNNER_INPUT_URL}
-      - ACTIONS_RUNNER_INPUT_TOKEN=${ACTIONS_RUNNER_INPUT_TOKEN}
-      - ACTIONS_RUNNER_INPUT_LABELS=${ACTIONS_RUNNER_INPUT_LABELS:-ubuntu24-public}
+      - ACTIONS_RUNNER_INPUT_LABELS=${ACTIONS_RUNNER_INPUT_LABELS:-self-hosted-runners,ubuntu24}
+    
+    # Gắn secret có tên 'runner_token' vào container
+    secrets:
+      - runner_token
+
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+# Khai báo rằng stack này sử dụng một secret đã tồn tại sẵn
+secrets:
+  runner_token:
+    external: true
