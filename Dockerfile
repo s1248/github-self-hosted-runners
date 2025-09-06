@@ -7,7 +7,8 @@ LABEL license="MPL-2.0"
 
 # Các biến môi trường để cài đặt runner
 ARG RUNNER_VERSION="2.311.0"
-ARG RUNNER_ARCH="x64"
+# Sử dụng TARGETARCH để xác định kiến trúc khi build đa nền tảng
+ARG TARGETARCH
 ENV RUNNER_USER="runner"
 ENV RUNNER_HOME="/home/runner"
 ENV ACTIONS_RUNNER_INPUT_URL=""
@@ -30,10 +31,15 @@ RUN useradd -m -s /bin/bash "${RUNNER_USER}" && \
 # Chuyển sang thư mục home của người dùng runner
 WORKDIR "${RUNNER_HOME}"
 
-# Tải và cài đặt GitHub Actions runner
-RUN curl -o actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz && \
-    tar xzf ./actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz && \
-    rm ./actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz
+# Tải và cài đặt GitHub Actions runner phù hợp với kiến trúc
+RUN set -e; \
+    if [ "$TARGETARCH" = "amd64" ]; then export ARCH="x64"; \
+    elif [ "$TARGETARCH" = "arm64" ]; then export ARCH="arm64"; \
+    elif [ "$TARGETARCH" = "arm" ]; then export ARCH="arm"; \
+    else echo "Unsupported architecture: $TARGETARCH" && exit 1; fi; \
+    curl -o actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz && \
+    tar xzf ./actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz && \
+    rm ./actions-runner-linux-${ARCH}-${RUNNER_VERSION}.tar.gz
 
 # Cài đặt các dependencies cho runner
 RUN sudo ./bin/installdependencies.sh

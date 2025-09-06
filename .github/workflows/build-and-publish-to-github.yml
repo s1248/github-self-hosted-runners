@@ -43,3 +43,4 @@ jobs:
           # Sử dụng tags đã được tạo tự động từ bước metadata
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
