@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  github-runner:
+    # Pull image công khai từ GitHub Container Registry
+    image: ghcr.io/s1248/github-self-hosted-runners:latest
+    container_name: github-runner
+    restart: always
+    environment:
+      # Các biến này sẽ được đọc từ file .env cục bộ trên server
+      - ACTIONS_RUNNER_INPUT_URL=${ACTIONS_RUNNER_INPUT_URL}
+      - ACTIONS_RUNNER_INPUT_TOKEN=${ACTIONS_RUNNER_INPUT_TOKEN}
+      - ACTIONS_RUNNER_INPUT_LABELS=${ACTIONS_RUNNER_INPUT_LABELS:-ubuntu24-public}

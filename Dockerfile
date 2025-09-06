@@ -1,0 +1,52 @@
+# Sử dụng base image Ubuntu 24.04
+FROM ubuntu:24.04
+
+# Thêm thông tin về giấy phép và người bảo trì
+LABEL maintainer="s1248.com <github-self-hosted-runners@s1248.com>"
+LABEL license="MPL-2.0"
+
+# Các biến môi trường để cài đặt runner
+ARG RUNNER_VERSION="2.311.0"
+ARG RUNNER_ARCH="x64"
+ENV RUNNER_USER="runner"
+ENV RUNNER_HOME="/home/runner"
+ENV ACTIONS_RUNNER_INPUT_URL=""
+ENV ACTIONS_RUNNER_INPUT_TOKEN=""
+ENV ACTIONS_RUNNER_INPUT_LABELS="ubuntu-24.04"
+
+# Cập nhật hệ thống và cài đặt các dependencies cần thiết
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    jq \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Tạo người dùng không phải root để chạy runner
+RUN useradd -m -s /bin/bash "${RUNNER_USER}" && \
+    usermod -aG sudo "${RUNNER_USER}" && \
+    echo "${RUNNER_USER} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Chuyển sang thư mục home của người dùng runner
+WORKDIR "${RUNNER_HOME}"
+
+# Tải và cài đặt GitHub Actions runner
+RUN curl -o actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz && \
+    tar xzf ./actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz && \
+    rm ./actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz
+
+# Cài đặt các dependencies cho runner
+RUN sudo ./bin/installdependencies.sh
+
+# Chuyển quyền sở hữu thư mục cho người dùng runner
+RUN sudo chown -R ${RUNNER_USER}:${RUNNER_USER} "${RUNNER_HOME}"
+
+# Chuyển sang người dùng runner
+USER ${RUNNER_USER}
+
+# Sao chép và cấp quyền thực thi cho entrypoint script
+COPY --chown=${RUNNER_USER}:${RUNNER_USER} entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+# Thiết lập entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
