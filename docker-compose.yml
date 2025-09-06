@@ -1,23 +1,31 @@
-version: '3.8'
+# Tệp này tuân thủ Compose Specification mới nhất.
+# Khóa "version" ở cấp cao nhất không còn cần thiết nữa.
 
 services:
   runner:
+    # Sử dụng image được chỉ định trong mẫu template.
     image: s1248/github-self-hosted-runners:latest
+
+    # Các biến môi trường sẽ được Portainer cung cấp dựa trên cấu hình template.
+    # Sử dụng cú pháp ${VARIABLE} để thay thế giá trị từ môi trường.
     environment:
-      # URL và Labels sẽ do người dùng nhập vào
       - ACTIONS_RUNNER_INPUT_URL=${ACTIONS_RUNNER_INPUT_URL}
       - ACTIONS_RUNNER_INPUT_LABELS=${ACTIONS_RUNNER_INPUT_LABELS:-self-hosted-runners,ubuntu24}
-    
-    # Gắn secret có tên 'runner_token' vào container
+
+    # Cấp cho dịch vụ quyền truy cập vào secret đã được định nghĩa.
+    # Secret này chứa token để đăng ký runner.
     secrets:
       - runner_token
 
+    # Cấu hình deploy dành riêng cho Docker Swarm.
     deploy:
       replicas: 1
       restart_policy:
         condition: on-failure
 
-# Khai báo rằng stack này sử dụng một secret đã tồn tại sẵn
+# Khai báo rằng stack này sử dụng một secret đã tồn tại từ trước.
+# Điều này có nghĩa là bạn phải tạo secret 'runner_token' trong Swarm
+# trước khi triển khai stack này.
 secrets:
   runner_token:
     external: true
