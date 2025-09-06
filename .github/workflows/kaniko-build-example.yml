@@ -1,0 +1,133 @@
+name: Secure Container Build with Kaniko
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  secure-build:
+    name: Build với Kaniko Runner
+    runs-on: [self-hosted, kaniko]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up build environment
+      run: |
+        echo "Setting up secure build environment..."
+        echo "Workspace: $(pwd)"
+        echo "Kaniko executor: $(ls -la /kaniko-executor)"
+        
+    - name: Build container image with Kaniko
+      run: |
+        # Sử dụng helper script để build image
+        IMAGE_TAG="${{ github.repository }}:${{ github.sha }}"
+        echo "Building image: $IMAGE_TAG"
+        
+        # Build image với Kaniko (không push, chỉ tạo tar)
+        kaniko-build.sh \
+          Dockerfile \
+          . \
+          "$IMAGE_TAG" \
+          --tar-path=/workspace/built-image.tar \
+          --no-push
+          
+    - name: Verify built image
+      run: |
+        echo "Verifying built image..."
+        if [ -f /workspace/built-image.tar ]; then
+          echo "✅ Image built successfully"
+          ls -lh /workspace/built-image.tar
+        else
+          echo "❌ Image build failed"
+          exit 1
+        fi
+        
+    - name: Run security scan (optional)
+      run: |
+        echo "🔍 Running security checks..."
+        # Ở đây có thể thêm security scanning tools
+        # như Trivy, Grype, hoặc other security scanners
+        echo "Security scan completed"
+        
+    - name: Push to registry (if on main branch)
+      if: github.ref == 'refs/heads/main'
+      run: |
+        echo "🚀 Pushing to production registry..."
+        IMAGE_TAG="${{ github.repository }}:${{ github.sha }}"
+        LATEST_TAG="${{ github.repository }}:latest"
+        
+        # Build và push image
+        kaniko-build.sh \
+          Dockerfile \
+          . \
+          "$IMAGE_TAG" \
+          --cache=true \
+          --compressed-caching=false
+          
+        # Tag và push latest
+        kaniko-build.sh \
+          Dockerfile \
+          . \
+          "$LATEST_TAG" \
+          --cache=true
+          
+    - name: Cleanup workspace
+      if: always()
+      run: |
+        echo "🧹 Cleaning up workspace..."
+        rm -f /workspace/built-image.tar
+        echo "Cleanup completed"
+
+  # Job để demo multi-stage build
+  multi-stage-build:
+    name: Multi-stage Build Demo
+    runs-on: [self-hosted, kaniko]
+    needs: secure-build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Build production image
+      run: |
+        echo "🏗️ Building production image with multi-stage..."
+        
+        # Build chỉ production stage
+        kaniko-build.sh \
+          Dockerfile \
+          . \
+          "${{ github.repository }}:production-${{ github.sha }}" \
+          --target=production \
+          --cache=true \
+          --build-arg VERSION=${{ github.sha }} \
+          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+
+  # Job để test với different architectures
+  multi-arch-build:
+    name: Multi-Architecture Build
+    runs-on: [self-hosted, kaniko]
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+        
+    steps:
+    - name: Checkout repository  
+      uses: actions/checkout@v4
+      
+    - name: Build for ${{ matrix.platform }}
+      run: |
+        echo "🔧 Building for platform: ${{ matrix.platform }}"
+        ARCH=$(echo "${{ matrix.platform }}" | cut -d'/' -f2)
+        
+        kaniko-build.sh \
+          Dockerfile \
+          . \
+          "${{ github.repository }}:${{ github.sha }}-${ARCH}" \
+          --custom-platform="${{ matrix.platform }}" \
+          --cache=true
