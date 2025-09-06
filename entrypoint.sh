@@ -1,63 +1,69 @@
 #!/bin/bash
 
-# Bắt đầu dịch vụ Docker trong nền
+# Bắt đầu dịch vụ Docker trong nền. Bước này cần quyền root.
 /usr/bin/dockerd >/dev/null 2>&1 &
 sleep 5
 
-# ================= SỬA LỖI QUAN TRỌNG =================
-# Đọc nội dung từ file secret được chỉ định bởi GITHUB_PAT_FILE
-# và gán nó vào biến GITHUB_PAT.
-# Việc này phải được thực hiện TRƯỚC khi kiểm tra biến.
+# Đợi cho Docker socket xuất hiện và cấp quyền cho nhóm docker.
+# Điều này đảm bảo user 'runner' có thể truy cập nó.
+while [ ! -S /var/run/docker.sock ]; do
+  echo "Đang đợi Docker socket..."
+  sleep 1
+done
+chown root:docker /var/run/docker.sock
+
+# Đọc secret và export các biến để gosu có thể truyền chúng cho user 'runner'.
 if [ -n "${GITHUB_PAT_FILE}" ] && [ -f "${GITHUB_PAT_FILE}" ]; then
-  GITHUB_PAT=$(cat "${GITHUB_PAT_FILE}")
+  export GITHUB_PAT=$(cat "${GITHUB_PAT_FILE}")
 fi
-# =======================================================
+export GITHUB_OWNER
+export GITHUB_REPOSITORY
+export RUNNER_LABELS
 
-# Kiểm tra các biến môi trường cần thiết
-if [ -z "${GITHUB_PAT}" ] || [ -z "${GITHUB_OWNER}" ] || [ -z "${GITHUB_REPOSITORY}" ]; then
-  echo "LỖI: Các biến môi trường GITHUB_PAT, GITHUB_OWNER, GITHUB_REPOSITORY là bắt buộc."
-  echo "Vui lòng kiểm tra lại cấu hình Stack trên Portainer."
-  # Dừng script lại 300 giây để bạn có thời gian đọc log
-  sleep 300
-  exit 1
-fi
+# =================== BƯỚC HẠ QUYỀN ===================
+# Sử dụng 'gosu' để thực thi phần còn lại của script với tư cách là user 'runner'.
+# 'bash -c' được dùng để chạy một chuỗi lệnh.
+# Mọi lệnh bên trong dấu '...' sẽ được chạy bởi user 'runner'.
+exec gosu runner bash -c '
+  # Chuyển vào thư mục làm việc
+  cd /actions-runner
 
-# Lấy Registration Token từ GitHub API
-echo "Đang yêu cầu registration token từ GitHub..."
-REG_TOKEN=$(curl -s -X POST \
-  -H "Accept: application/vnd.github.v3+json" \
-  -H "Authorization: token ${GITHUB_PAT}" \
-  "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}/actions/runners/registration-token" | jq .token --raw-output)
-
-# Xử lý lỗi nếu không lấy được token
-if [ -z "${REG_TOKEN}" ] || [ "${REG_TOKEN}" == "null" ]; then
-    echo "LỖI: Không thể lấy được registration token từ GitHub. Vui lòng kiểm tra GITHUB_PAT và tên repository."
-    sleep 300
+  # Kiểm tra các biến môi trường
+  if [ -z "${GITHUB_PAT}" ] || [ -z "${GITHUB_OWNER}" ] || [ -z "${GITHUB_REPOSITORY}" ]; then
+    echo "LỖI: Các biến môi trường GITHUB_PAT, GITHUB_OWNER, GITHUB_REPOSITORY là bắt buộc."
     exit 1
-fi
+  fi
 
-# Dọn dẹp cấu hình cũ nếu có
-./config.sh remove --token "${REG_TOKEN}"
+  # Lấy Registration Token
+  echo "Đang yêu cầu registration token từ GitHub..."
+  REG_TOKEN=$(curl -s -X POST \
+    -H "Accept: application/vnd.github.v3+json" \
+    -H "Authorization: token ${GITHUB_PAT}" \
+    "https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPOSITORY}/actions/runners/registration-token" | jq .token --raw-output)
 
-# Cấu hình runner
-echo "Đang cấu hình runner..."
-./config.sh \
-    --url "https://github.com/${GITHUB_OWNER}/${GITHUB_REPOSITORY}" \
-    --token "${REG_TOKEN}" \
-    --name "dind-runner-$(hostname)" \
-    --labels "${RUNNER_LABELS}" \
-    --unattended \
-    --replace
+  if [ -z "${REG_TOKEN}" ] || [ "${REG_TOKEN}" == "null" ]; then
+      echo "LỖI: Không thể lấy được registration token."
+      exit 1
+  fi
 
-# Hàm dọn dẹp
-cleanup() {
-    echo "Đang gỡ bỏ runner..."
-    ./config.sh remove --token "${REG_TOKEN}"
-}
+  # Cấu hình runner
+  echo "Đang cấu hình runner..."
+  ./config.sh \
+      --url "https://github.com/${GITHUB_OWNER}/${GITHUB_REPOSITORY}" \
+      --token "${REG_TOKEN}" \
+      --name "dind-runner-$(hostname)" \
+      --labels "${RUNNER_LABELS}" \
+      --unattended \
+      --replace
 
-# Bẫy các tín hiệu thoát
-trap 'cleanup; exit 130' INT
-trap 'cleanup; exit 143' TERM
+  # Hàm dọn dẹp
+  cleanup() {
+      echo "Đang gỡ bỏ runner..."
+      ./config.sh remove --token "${REG_TOKEN}"
+  }
+  trap "cleanup; exit 130" INT
+  trap "cleanup; exit 143" TERM
 
-# Chạy runner
-./run.sh & wait $!
+  # Chạy runner
+  ./run.sh & wait $!
+'

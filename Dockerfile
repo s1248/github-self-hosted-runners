@@ -1,23 +1,20 @@
-# Giai đoạn 1: Base Image và Cài đặt
-# Bắt đầu từ một image Ubuntu LTS (Long-Term Support) ổn định.
+# Bắt đầu từ image Ubuntu LTS ổn định.
 FROM ubuntu:22.04
 
-# Các biến được sử dụng trong quá trình build image.
+# Các biến build image.
 ARG RUNNER_VERSION="2.317.0"
-# Đảm bảo kiến trúc này khớp với server của bạn
 ARG RUNNER_ARCH="arm64"
 
-# Các biến môi trường sẽ được sử dụng khi container chạy.
+# Các biến môi trường khi container chạy.
 ENV GITHUB_PAT=""
 ENV GITHUB_OWNER=""
 ENV GITHUB_REPOSITORY=""
 ENV RUNNER_LABELS="self-hosted-runners"
 
-# --- Thiết lập thư mục làm việc ---
-# Đặt WORKDIR sớm. Tất cả các lệnh sau sẽ chạy trong thư mục này.
+# Thiết lập WORKDIR sớm.
 WORKDIR /actions-runner
 
-# --- Cài đặt các gói phụ thuộc cần thiết ---
+# --- Cài đặt các gói phụ thuộc ---
 RUN apt-get update && apt-get install -y \
     curl \
     git \
@@ -36,24 +33,28 @@ RUN echo \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   tee /etc/apt/sources.list.d/docker.list > /dev/null
 RUN apt-get update && apt-get install -y \
-    docker-ce \
-    docker-ce-cli \
-    containerd.io \
-    docker-buildx-plugin \
-    docker-compose-plugin
+    docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+
+# --- Cài đặt GOSU để hạ quyền an toàn ---
+RUN curl -o /usr/local/bin/gosu -sSL "https://github.com/tianon/gosu/releases/download/1.17/gosu-$(dpkg --print-architecture | sed 's/aarch64/arm64/')" \
+    && chmod +x /usr/local/bin/gosu
+
+# --- Tạo User và Cấp quyền ---
+# Tạo user 'runner' không có mật khẩu, tạo home directory.
+RUN useradd -m -s /bin/bash runner
+# Thêm user 'runner' vào nhóm 'docker' để có quyền sử dụng Docker daemon.
+RUN usermod -aG docker runner
 
 # --- Tải và cài đặt GitHub Actions Runner ---
-# Vì WORKDIR đã là /actions-runner, runner sẽ được tải và giải nén vào đúng chỗ.
 RUN curl -o actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz -L https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz \
     && tar xzf ./actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz \
     && rm ./actions-runner-linux-${RUNNER_ARCH}-${RUNNER_VERSION}.tar.gz
 
-# --- Sao chép và cấu hình Entrypoint Script ---
-# Lệnh COPY . sẽ sao chép file vào WORKDIR hiện tại, tức là /actions-runner.
-# Vì vậy file sẽ nằm ở /actions-runner/entrypoint.sh
+# --- Sao chép Entrypoint và Cấp quyền cuối cùng ---
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
+# Cấp quyền sở hữu toàn bộ thư mục cho user 'runner'.
+RUN chown -R runner:runner /actions-runner
 
-# Chạy entrypoint script khi container khởi động.
-# Sử dụng đường dẫn tuyệt đối là cách làm an toàn và rõ ràng nhất.
+# Entrypoint sẽ chạy với quyền root mặc định.
 ENTRYPOINT ["/actions-runner/entrypoint.sh"]
